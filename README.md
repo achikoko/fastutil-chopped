@@ -20,7 +20,7 @@ Go into fastutil with `cd fastutil` and follow the instructions into the [fastut
 - `cd ..` to get back to repo root.
 - Modify the file `pom-extra.template.xml` to fill your needs, this file will be inserted inside the parent pom and lets you add deployment repositories and/or packaging repositories. Basically fill the `<build>` tag of the root pom.
 
-### Step 3 - Make the breakdown
+### Step 3 - Execute the chopping
 
 Execute
 

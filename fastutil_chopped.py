@@ -65,9 +65,11 @@ class DoubleSourceFileTemplate:
         self.pref = pref
 
         self.__all_except: Optional[list[tuple[Type, Type]]] = None
+        self.__no_except: Optional[list[tuple[Type, Type]]] = None
         self.__only_same_type_except: Optional[list[Type]] = None
         self.__only_if_first_is: Optional[list[Type]] = None
         self.__only_if_first_is_not: Optional[list[Type]] = None
+        self.__only_if_second_is_not: Optional[list[Type]] = None
 
     def get_file_for_types(self, type1: Type, type2: Type):
         constant_type1 = type1
@@ -77,6 +79,13 @@ class DoubleSourceFileTemplate:
             for t1, t2 in self.__all_except:
                 if constant_type1 == t1 and constant_type2 == t2:
                     return None
+
+        if self.__no_except is not None:
+            for t1, t2 in self.__no_except:
+                if constant_type1 == t1 and constant_type2 == t2:
+                    break
+            else:
+                return None
 
         if self.__only_same_type_except is not None:
             if constant_type1 != constant_type2:
@@ -95,6 +104,11 @@ class DoubleSourceFileTemplate:
                 if t == constant_type1:
                     return None
 
+        if self.__only_if_second_is_not is not None:
+            for t in self.__only_if_second_is_not:
+                if t == constant_type2:
+                    return None
+
         return SourceFile(type1.lc2 + 's', self.pref + type1.cap + self.inf + type2.cap + self.suf, double_source_file_template=self, type1=type1, type2=type2)
 
     def only_same_type_except(self, *types: Type) -> 'DoubleSourceFileTemplate':
@@ -105,12 +119,20 @@ class DoubleSourceFileTemplate:
         self.__all_except = [*type_tuples]
         return self
 
+    def no_except(self, *type_tuples: tuple[Type, Type]) -> 'DoubleSourceFileTemplate':
+        self.__no_except = [*type_tuples]
+        return self
+
     def only_if_first_is(self, *types: Type) -> 'DoubleSourceFileTemplate':
         self.__only_if_first_is = [*types]
         return self
 
     def only_if_first_is_not(self, *types: Type) -> 'DoubleSourceFileTemplate':
         self.__only_if_first_is_not = [*types]
+        return self
+
+    def only_if_second_is_not(self, *types: Type) -> 'DoubleSourceFileTemplate':
+        self.__only_if_second_is_not = [*types]
         return self
 
 
@@ -148,6 +170,9 @@ class SourceFile:
             return (self.file_name + '.java') == other
         else:
             return super().__eq__(other)
+
+    def __repr__(self):
+        return self.file_name + '.java'
 
     def get_file_name_with_dir(self):
         return (self.folder + '/' if self.folder is not None else '/') + self.file_name + '.java'
@@ -257,6 +282,8 @@ type_double_source_file_defs: list[DoubleSourceFileTemplate] = [
     DoubleSourceFileTemplate('', '2', 'RBTreeMap').only_if_first_is_not(boolean, reference),
     DoubleSourceFileTemplate('', '2', 'SortedMap').only_if_first_is_not(boolean),
     DoubleSourceFileTemplate('', '2', 'SortedMaps').only_if_first_is_not(boolean),
+    DoubleSourceFileTemplate('', '', 'BiConsumer').only_if_first_is_not(reference).only_if_second_is_not(reference).all_except((object, object)),
+    # DoubleSourceFileTemplate('', '', 'BiConsumer').no_except((reference, reference)),
 
     DoubleSourceFileTemplate('', '', 'ImmutablePair'),
     DoubleSourceFileTemplate('', '', 'MutablePair'),
@@ -416,12 +443,12 @@ def check_all_files_exist():
     i_projected = 0
     for projected in all_projected_files:
         if projected.get_file_name() not in all_original_files:
-            if i_original == 0:
+            if i_projected == 0:
                 print(f'Files that exist in projected but not in original: ')
             print(f'{i_projected}    {projected}')
             i_projected += 1
 
-    if i_original != 0 and i_projected != 0:
+    if i_original != 0 or i_projected != 0:
         raise Exception('Files got outdated, aborting.')
 
     return all_projected_files
@@ -732,7 +759,7 @@ def main():
         .add_filter(select_by_name_startswith('SafeMath'))
         .add_filter(select_by_suffix_endswith('Functions'))
         .add_filter(select_by_suffix_endswith('Function'))
-        .add_filter(select_by_suffix_endswith('Consumer'))
+        .add_filter(select_by_suffix_endswith('Consumer')) # and 'BiConsumer'
         .add_filter(select_by_suffix_endswith('Consumers'))
         .add_filter(select_by_suffix_endswith('Predicate'))
         .add_filter(select_by_suffix_endswith('Predicates'))
@@ -871,7 +898,7 @@ def main():
                     select_by_suffix_endswith('Maps'),
                 ))
                 .add_dependency(module_pair)
-                .add_dependency(module_collections)
+                .add_dependency(module_collections) # Maps are the only dependent of BiConsumers, but they are in functions <- collections <- maps
                 .add_dependency(sets[object.idx]) # Everybody wants objects
                 .add_dependency(sets[type1.idx] if type1 != object else None) # Add counterpart set
                 .add_dependency(sets[type2.idx] if type2 != object else None) # Add counterpart set
@@ -965,7 +992,7 @@ if __name__ == '__main__':
 
     # MAVEN_GROUP_ID = 'io.github.achiikun.fastutil'
     MAVEN_PARENT_ARTIFACT_ID = 'fastutil'
-    MAVEN_VERSION = '8.5.13'
+    MAVEN_VERSION = '8.5.18'
 
     import argparse
     parser = argparse.ArgumentParser()
